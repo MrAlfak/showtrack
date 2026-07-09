@@ -316,8 +316,8 @@ func (h *Handler) fetchAndReturnShow(c *fiber.Ctx, tmdbIDStr string) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	if err := h.syncShowDetails(showID, show); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	if syncErr := h.syncShowDetails(showID, show); syncErr != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, syncErr.Error())
 	}
 
 	for _, member := range show.Credits.Cast {
@@ -662,8 +662,8 @@ func (h *Handler) AddShow(c *fiber.Ctx) error {
 			if err != nil {
 				return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 			}
-			if err := h.syncShowDetails(showID, show); err != nil {
-				return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+			if syncErr := h.syncShowDetails(showID, show); syncErr != nil {
+				return fiber.NewError(fiber.StatusInternalServerError, syncErr.Error())
 			}
 		} else {
 			return fiber.NewError(fiber.StatusNotFound, "show not found")
@@ -1044,8 +1044,8 @@ func (h *Handler) resolveImportedShow(item importItem) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if err := h.syncShowDetails(showID, show); err != nil {
-			return 0, err
+		if syncErr := h.syncShowDetails(showID, show); syncErr != nil {
+			return 0, syncErr
 		}
 		return showID, nil
 	}

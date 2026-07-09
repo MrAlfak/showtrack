@@ -92,8 +92,8 @@ func verifyGoogleIDToken(idToken, clientID string) (*googleProfile, error) {
 		return nil, err
 	}
 	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, err
+	if unmarshalErr := json.Unmarshal(raw, &payload); unmarshalErr != nil {
+		return nil, unmarshalErr
 	}
 	aud, _ := payload["aud"].(string)
 	if aud != clientID {
