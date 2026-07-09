@@ -123,6 +123,7 @@ services:
     build:
       context: ../services/push
       dockerfile: Dockerfile
+    profiles: ["push"]
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://showtrack:${POSTGRES_PASSWORD:-showtrack}@postgres:5432/showtrack?sslmode=disable
