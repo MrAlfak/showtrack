@@ -231,6 +231,7 @@ func (h *Handler) Onboarding(c *fiber.Ctx) error {
 		if item.TMDBID == 0 {
 			continue
 		}
+		var err error
 		mediaType := item.MediaType
 		if mediaType == "" {
 			mediaType = "tv"
