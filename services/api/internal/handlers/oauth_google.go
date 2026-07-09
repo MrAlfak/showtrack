@@ -37,7 +37,7 @@ func (h *Handler) GoogleAuth(c *fiber.Ctx) error {
 
 	isNew := false
 	var userID uuid.UUID
-	err := h.db.QueryRow(context.Background(),
+	err = h.db.QueryRow(context.Background(),
 		`SELECT id FROM users WHERE google_sub = $1`, profile.Sub,
 	).Scan(&userID)
 	if err == pgx.ErrNoRows {
