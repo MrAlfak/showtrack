@@ -50,9 +50,9 @@ func (h *Handler) GetGenres(c *fiber.Ctx) error {
 			genres = append(genres, genreItem{ID: g.ID, Name: g.Name})
 		}
 	} else {
-		list, err := h.tmdb.TVGenres()
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadGateway, err.Error())
+		list, tmdbErr := h.tmdb.TVGenres()
+		if tmdbErr != nil {
+			return fiber.NewError(fiber.StatusBadGateway, tmdbErr.Error())
 		}
 		for _, g := range list.Genres {
 			genres = append(genres, genreItem{ID: g.ID, Name: g.Name})
@@ -143,9 +143,9 @@ func (h *Handler) GetRecommendations(c *fiber.Ctx) error {
 		HasTMDB:   h.cfg.TMDBAPIKey != "",
 		PosterURL: h.posterURL,
 	}
-	out, err := engine.Generate(context.Background(), userID)
-	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	out, genErr := engine.Generate(context.Background(), userID)
+	if genErr != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, genErr.Error())
 	}
 
 	if len(out.Results) == 0 && !engine.HasTMDB {
