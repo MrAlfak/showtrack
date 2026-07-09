@@ -114,10 +114,16 @@ func (h *Handler) SyncTrakt(c *fiber.Ctx) error {
 	imported := 0
 	skipped := 0
 
+	var episodes []trakt.HistoryEpisode
+	var movies []trakt.HistoryMovie
+	var pageErr error
+	var ok bool
+	var importErr error
+
 	for page := 1; page <= 5; page++ {
-		episodes, err := client.GetEpisodeHistory(accessToken, page)
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadGateway, err.Error())
+		episodes, pageErr = client.GetEpisodeHistory(accessToken, page)
+		if pageErr != nil {
+			return fiber.NewError(fiber.StatusBadGateway, pageErr.Error())
 		}
 		if len(episodes) == 0 {
 			break
@@ -128,7 +134,7 @@ func (h *Handler) SyncTrakt(c *fiber.Ctx) error {
 				continue
 			}
 			watchedAt := item.WatchedAt
-			ok, err := h.importTraktEpisode(userID, importItem{
+			ok, importErr = h.importTraktEpisode(userID, importItem{
 				TMDBID:        item.Show.IDs.TMDB,
 				ShowTitle:     item.Show.Title,
 				MediaType:     "tv",
@@ -136,7 +142,7 @@ func (h *Handler) SyncTrakt(c *fiber.Ctx) error {
 				EpisodeNumber: item.Episode.Number,
 				WatchedAt:     &watchedAt,
 			})
-			if err != nil || !ok {
+			if importErr != nil || !ok {
 				skipped++
 				continue
 			}
@@ -148,9 +154,9 @@ func (h *Handler) SyncTrakt(c *fiber.Ctx) error {
 	}
 
 	for page := 1; page <= 3; page++ {
-		movies, err := client.GetMovieHistory(accessToken, page)
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadGateway, err.Error())
+		movies, pageErr = client.GetMovieHistory(accessToken, page)
+		if pageErr != nil {
+			return fiber.NewError(fiber.StatusBadGateway, pageErr.Error())
 		}
 		if len(movies) == 0 {
 			break
@@ -161,13 +167,13 @@ func (h *Handler) SyncTrakt(c *fiber.Ctx) error {
 				continue
 			}
 			watchedAt := item.WatchedAt
-			ok, err := h.importMovieItem(userID, importItem{
+			ok, importErr = h.importMovieItem(userID, importItem{
 				TMDBID:    item.Movie.IDs.TMDB,
 				ShowTitle: item.Movie.Title,
 				MediaType: "movie",
 				WatchedAt: &watchedAt,
 			})
-			if err != nil || !ok {
+			if importErr != nil || !ok {
 				skipped++
 				continue
 			}
