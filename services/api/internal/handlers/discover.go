@@ -33,7 +33,8 @@ func (h *Handler) GetGenres(c *fiber.Ctx) error {
 	mediaType := c.Query("type", "tv")
 	cacheKey := fmt.Sprintf("genres:%s", mediaType)
 
-	if cached, err := h.redis.Get(context.Background(), cacheKey).Result(); err == nil {
+	cached, err := h.redis.Get(context.Background(), cacheKey).Result()
+	if err == nil {
 		return c.Type("json").SendString(cached)
 	}
 
@@ -73,7 +74,8 @@ func (h *Handler) Discover(c *fiber.Ctx) error {
 	}
 
 	cacheKey := fmt.Sprintf("discover:%s:%d:%s", mediaType, genreID, sort)
-	if cached, err := h.redis.Get(context.Background(), cacheKey).Result(); err == nil {
+	cached, err := h.redis.Get(context.Background(), cacheKey).Result()
+	if err == nil {
 		return c.Type("json").SendString(cached)
 	}
 
@@ -130,7 +132,8 @@ func (h *Handler) GetRecommendations(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 
 	cacheKey := fmt.Sprintf("recommendations:%s", userID)
-	if cached, err := h.redis.Get(context.Background(), cacheKey).Result(); err == nil {
+	cached, err := h.redis.Get(context.Background(), cacheKey).Result()
+	if err == nil {
 		return c.Type("json").SendString(cached)
 	}
 
