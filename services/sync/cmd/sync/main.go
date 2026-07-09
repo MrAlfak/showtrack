@@ -36,38 +36,8 @@ func main() {
 
 	log.Println("sync started")
 	syncPosters(ctx, pool, mediaDir, tmdbKey)
-	syncMoviePosters(ctx, pool, mediaDir, tmdbKey)
 	syncAirDates(ctx, pool, tmdbKey)
 	log.Println("sync completed")
-}
-
-func syncMoviePosters(ctx context.Context, pool *pgxpool.Pool, mediaDir, tmdbKey string) {
-	rows, err := pool.Query(ctx, `
-		SELECT id, tmdb_id, poster_path FROM movies
-		WHERE poster_path IS NOT NULL AND poster_path != ''
-		AND (poster_local IS NULL OR poster_local = '')
-		LIMIT 100`)
-	if err != nil {
-		log.Printf("movie poster query: %v", err)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id, tmdbID int
-		var posterPath string
-		if err := rows.Scan(&id, &tmdbID, &posterPath); err != nil {
-			continue
-		}
-		localPath, err := downloadPoster(mediaDir, tmdbID, posterPath)
-		if err != nil {
-			log.Printf("movie poster %d: %v", tmdbID, err)
-			continue
-		}
-		_, _ = pool.Exec(ctx, `UPDATE movies SET poster_local = $1 WHERE id = $2`, localPath, id)
-		log.Printf("movie poster saved: %s", localPath)
-		time.Sleep(300 * time.Millisecond)
-	}
 }
 
 func syncPosters(ctx context.Context, pool *pgxpool.Pool, mediaDir, tmdbKey string) {

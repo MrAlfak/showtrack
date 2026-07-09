@@ -85,12 +85,16 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 
 func checkNewEpisodes(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client) {
 	rows, err := pool.Query(ctx, `
-		SELECT DISTINCT us.user_id::text, sh.title, sh.id, e.id, e.name, sn.season_number, e.episode_number
+		SELECT DISTINCT us.user_id::text, sh.title, sh.tmdb_id, e.id, e.name, sn.season_number, e.episode_number
 		FROM episodes e
 		JOIN seasons sn ON sn.id = e.season_id
 		JOIN shows sh ON sh.id = sn.show_id
 		JOIN user_shows us ON us.show_id = sh.id
-		WHERE e.air_date = CURRENT_DATE AND e.notified = false`)
+		LEFT JOIN user_episodes ue ON ue.episode_id = e.id AND ue.user_id = us.user_id
+		WHERE e.air_date <= CURRENT_DATE
+		  AND e.notified = false
+		  AND us.list_status IN ('watching', 'plan_to_watch')
+		  AND ue.id IS NULL`)
 	if err != nil {
 		log.Printf("episode check: %v", err)
 		return
@@ -99,21 +103,42 @@ func checkNewEpisodes(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client
 
 	for rows.Next() {
 		var userID, showTitle, epName string
-		var showID, epID, seasonNum, epNum int
-		if err := rows.Scan(&userID, &showTitle, &showID, &epID, &epName, &seasonNum, &epNum); err != nil {
+		var showTMDBID, epID, seasonNum, epNum int
+		if err := rows.Scan(&userID, &showTitle, &showTMDBID, &epID, &epName, &seasonNum, &epNum); err != nil {
 			continue
 		}
+
+		var already int
+		_ = pool.QueryRow(ctx, `
+			SELECT COUNT(*) FROM notification_log
+			WHERE user_id = $1::uuid AND episode_id = $2 AND status = 'sent'`,
+			userID, epID,
+		).Scan(&already)
+		if already > 0 {
+			continue
+		}
+
 		job := NotificationJob{
 			UserID:  userID,
 			Title:   fmt.Sprintf("New episode: %s", showTitle),
 			Body:    fmt.Sprintf("S%dE%d — %s", seasonNum, epNum, epName),
-			ShowID:  showID,
+			ShowID:  showTMDBID,
 			Episode: epID,
 		}
 		data, _ := json.Marshal(job)
 		rdb.LPush(ctx, "notifications", data)
-		_, _ = pool.Exec(ctx, `UPDATE episodes SET notified = true WHERE id = $1`, epID)
 	}
+
+	_, _ = pool.Exec(ctx, `
+		UPDATE episodes e SET notified = true
+		WHERE e.air_date <= CURRENT_DATE AND e.notified = false
+		  AND EXISTS (
+		    SELECT 1 FROM seasons sn
+		    JOIN shows sh ON sh.id = sn.show_id
+		    JOIN user_shows us ON us.show_id = sh.id
+		    WHERE sn.id = e.season_id
+		      AND us.list_status IN ('watching', 'plan_to_watch')
+		  )`)
 }
 
 func sendNotification(ctx context.Context, pool *pgxpool.Pool, job NotificationJob) error {

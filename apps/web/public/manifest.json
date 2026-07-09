@@ -1,18 +1,26 @@
 {
   "name": "ShowTrack",
   "short_name": "ShowTrack",
-  "description": "Self-hosted TV show and movie tracker",
+  "description": "Self-hosted TV show tracker inspired by TV Time",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#7c3aed",
-  "orientation": "portrait",
+  "background_color": "#050505",
+  "theme_color": "#ffd60a",
+  "orientation": "portrait-primary",
+  "lang": "fa",
+  "dir": "auto",
   "icons": [
     {
-      "src": "/placeholder-poster.svg",
+      "src": "/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }

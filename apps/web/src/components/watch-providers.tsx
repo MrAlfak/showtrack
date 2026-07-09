@@ -47,7 +47,7 @@ export function WatchProvidersSection({ mediaType, tmdbId }: Props) {
     return (
       <section className="space-y-2">
         <h2 className="text-base font-semibold">{t.detail.whereToWatch}</h2>
-        <Card className="border-border/60 bg-card/80 py-0 shadow-none">
+        <Card className="tv-card py-0 shadow-none">
           <CardContent className="p-4 text-sm text-muted-foreground">{t.detail.noProviders}</CardContent>
         </Card>
       </section>
@@ -74,7 +74,7 @@ export function WatchProvidersSection({ mediaType, tmdbId }: Props) {
           href={data.link}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+          className="inline-flex items-center gap-1 text-xs text-[var(--tv-yellow)] hover:underline"
         >
           {t.detail.viewOnTMDB}
           <ExternalLink className="size-3" />
@@ -98,7 +98,7 @@ function ProviderGroup({
         {providers.map((provider) => (
           <div
             key={provider.id}
-            className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-2 py-1.5"
+            className="flex items-center gap-2 rounded-lg border border-white/5 bg-card px-2 py-1.5"
           >
             <div className="relative size-6 overflow-hidden rounded">
               <Image src={provider.logo_url} alt={provider.name} fill className="object-cover" unoptimized />

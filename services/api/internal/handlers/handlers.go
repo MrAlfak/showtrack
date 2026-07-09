@@ -52,6 +52,7 @@ type dashboardStatsPayload struct {
 	Total    int `json:"total"`
 	Hours    int `json:"hours"`
 	Streak   int `json:"streak"`
+	BingeToday int `json:"binge_today"`
 }
 
 type upcomingPayload struct {
@@ -126,14 +127,17 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid body")
 	}
 	var id uuid.UUID
-	var hash string
+	var hash *string
 	err := h.db.QueryRow(context.Background(),
 		`SELECT id, password_hash FROM users WHERE email = $1`, req.Email,
 	).Scan(&id, &hash)
 	if err != nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
+	if hash == nil || *hash == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "use google sign-in for this account")
+	}
+	if bcrypt.CompareHashAndPassword([]byte(*hash), []byte(req.Password)) != nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
 	}
 	token, err := h.signToken(id.String())
@@ -265,7 +269,7 @@ func (h *Handler) GetShow(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(fiber.Map{
+	resp := fiber.Map{
 		"id":           showID,
 		"tmdb_id":      tmdbID,
 		"title":        title,
@@ -279,7 +283,15 @@ func (h *Handler) GetShow(c *fiber.Ctx) error {
 		"progress":     progress,
 		"watched":      watchedEpisodes,
 		"total":        totalEpisodes,
-	})
+	}
+	if userID != "" {
+		var tmdbInt int
+		fmt.Sscanf(tmdbID, "%d", &tmdbInt)
+		if score, review, ok := h.getUserRating(userID, "tv", tmdbInt); ok {
+			resp["user_rating"] = fiber.Map{"score": score, "review": review}
+		}
+	}
+	return c.JSON(resp)
 }
 
 func (h *Handler) fetchAndReturnShow(c *fiber.Ctx, tmdbIDStr string) error {
@@ -415,11 +427,12 @@ func (h *Handler) fetchAndReturnPerson(c *fiber.Ctx, tmdbIDStr string) error {
 
 func (h *Handler) GetLibrary(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
-	shows, err := h.getLibraryItems(userID)
+	listStatus := c.Query("list_status")
+	shows, err := h.getLibraryItems(userID, listStatus)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	movies, err := h.getMovieLibraryItems(userID)
+	movies, err := h.getMovieLibraryItems(userID, listStatus)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
@@ -429,11 +442,11 @@ func (h *Handler) GetLibrary(c *fiber.Ctx) error {
 func (h *Handler) GetDashboard(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 
-	library, err := h.getLibraryItems(userID)
+	library, err := h.getActiveLibraryItems(userID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	movieLibrary, err := h.getMovieLibraryItems(userID)
+	movieLibrary, err := h.getActiveMovieLibraryItems(userID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
@@ -441,31 +454,9 @@ func (h *Handler) GetDashboard(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	stats := dashboardStatsPayload{
-		Shows:    len(library),
-		Movies:   len(movieLibrary),
-		Episodes: 0,
-		Total:    0,
-		Hours:    0,
-		Streak:   0,
-	}
-	for _, item := range library {
-		if watched, ok := item["watched"].(int); ok {
-			stats.Episodes += watched
-		}
-		if total, ok := item["total"].(int); ok {
-			stats.Total += total
-		}
-	}
-	for _, item := range movieLibrary {
-		if watched, ok := item["watched"].(int); ok && watched > 0 {
-			stats.Episodes++
-		}
-		stats.Total++
-	}
-	stats.Hours = int(float64(stats.Episodes) * 0.75)
-	if stats.Shows+stats.Movies > 0 {
-		stats.Streak = max(1, min(7, stats.Episodes/6))
+	stats, err := h.computeUserStats(userID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	combined := append(library, movieLibrary...)
@@ -638,10 +629,18 @@ func (h *Handler) ImportWatchHistory(c *fiber.Ctx) error {
 func (h *Handler) AddShow(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	var body struct {
-		TMDBID int `json:"tmdb_id"`
+		TMDBID     int    `json:"tmdb_id"`
+		ListStatus string `json:"list_status"`
 	}
 	if err := c.BodyParser(&body); err != nil || body.TMDBID == 0 {
 		return fiber.NewError(fiber.StatusBadRequest, "tmdb_id required")
+	}
+	listStatus := body.ListStatus
+	if listStatus == "" {
+		listStatus = "watching"
+	}
+	if !validListStatuses[listStatus] {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid list_status")
 	}
 
 	var showID int
@@ -671,14 +670,17 @@ func (h *Handler) AddShow(c *fiber.Ctx) error {
 		}
 	}
 
-	_, err = h.db.Exec(context.Background(),
-		`INSERT INTO user_shows (user_id, show_id) VALUES ($1::uuid, $2) ON CONFLICT DO NOTHING`,
-		userID, showID,
+	_, err = h.db.Exec(context.Background(), `
+		INSERT INTO user_shows (user_id, show_id, list_status) VALUES ($1::uuid, $2, $3)
+		ON CONFLICT (user_id, show_id) DO UPDATE SET list_status = EXCLUDED.list_status`,
+		userID, showID, listStatus,
 	)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(fiber.Map{"ok": true, "show_id": showID})
+	h.logShowAdded(userID, showID, listStatus)
+	h.invalidateUserRecommendations(userID)
+	return c.JSON(fiber.Map{"ok": true, "show_id": showID, "list_status": listStatus})
 }
 
 func (h *Handler) RemoveShow(c *fiber.Ctx) error {
@@ -703,6 +705,8 @@ func (h *Handler) MarkWatched(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
+	h.logEpisodeWatched(userID, epID)
+	h.invalidateUserRecommendations(userID)
 	return c.JSON(fiber.Map{"ok": true})
 }
 
@@ -867,20 +871,27 @@ func (h *Handler) getPersonCredits(personID int) ([]fiber.Map, error) {
 	return credits, nil
 }
 
-func (h *Handler) getLibraryItems(userID string) ([]fiber.Map, error) {
+func (h *Handler) getLibraryItems(userID string, listStatus string) ([]fiber.Map, error) {
+	statusFilter := ""
+	args := []any{userID}
+	if listStatus != "" && validListStatuses[listStatus] {
+		statusFilter = " AND us.list_status = $2"
+		args = append(args, listStatus)
+	}
 	rows, err := h.db.Query(context.Background(), `
 		SELECT s.id, s.tmdb_id, s.title, s.status, s.vote_average,
 		       COALESCE(s.poster_local, s.poster_path, ''),
 		       COUNT(e.id) AS total_eps,
-		       COUNT(ue.id) AS watched_eps
+		       COUNT(ue.id) AS watched_eps,
+		       us.list_status
 		FROM user_shows us
 		JOIN shows s ON s.id = us.show_id
 		LEFT JOIN seasons sn ON sn.show_id = s.id
 		LEFT JOIN episodes e ON e.season_id = sn.id
 		LEFT JOIN user_episodes ue ON ue.episode_id = e.id AND ue.user_id = $1::uuid
-		WHERE us.user_id = $1::uuid
-		GROUP BY s.id
-		ORDER BY us.added_at DESC`, userID,
+		WHERE us.user_id = $1::uuid`+statusFilter+`
+		GROUP BY s.id, us.list_status, us.added_at
+		ORDER BY us.added_at DESC`, args...,
 	)
 	if err != nil {
 		return nil, err
@@ -890,9 +901,9 @@ func (h *Handler) getLibraryItems(userID string) ([]fiber.Map, error) {
 	shows := []fiber.Map{}
 	for rows.Next() {
 		var id, tmdbID, totalEps, watchedEps int
-		var title, status, poster string
+		var title, status, poster, itemListStatus string
 		var voteAverage float64
-		if err := rows.Scan(&id, &tmdbID, &title, &status, &voteAverage, &poster, &totalEps, &watchedEps); err != nil {
+		if err := rows.Scan(&id, &tmdbID, &title, &status, &voteAverage, &poster, &totalEps, &watchedEps, &itemListStatus); err != nil {
 			continue
 		}
 		progress := 0.0
@@ -905,6 +916,58 @@ func (h *Handler) getLibraryItems(userID string) ([]fiber.Map, error) {
 			"title":        title,
 			"media_type":   "tv",
 			"status":       status,
+			"list_status":  itemListStatus,
+			"vote_average": voteAverage,
+			"poster_url":   h.resolvePoster(poster),
+			"progress":     progress,
+			"watched":      watchedEps,
+			"total":        totalEps,
+		})
+	}
+	return shows, nil
+}
+
+func (h *Handler) getActiveLibraryItems(userID string) ([]fiber.Map, error) {
+	rows, err := h.db.Query(context.Background(), `
+		SELECT s.id, s.tmdb_id, s.title, s.status, s.vote_average,
+		       COALESCE(s.poster_local, s.poster_path, ''),
+		       COUNT(e.id) AS total_eps,
+		       COUNT(ue.id) AS watched_eps,
+		       us.list_status
+		FROM user_shows us
+		JOIN shows s ON s.id = us.show_id
+		LEFT JOIN seasons sn ON sn.show_id = s.id
+		LEFT JOIN episodes e ON e.season_id = sn.id
+		LEFT JOIN user_episodes ue ON ue.episode_id = e.id AND ue.user_id = $1::uuid
+		WHERE us.user_id = $1::uuid
+		  AND us.list_status IN ('watching', 'plan_to_watch')
+		GROUP BY s.id, us.list_status, us.added_at
+		ORDER BY us.added_at DESC`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	shows := []fiber.Map{}
+	for rows.Next() {
+		var id, tmdbID, totalEps, watchedEps int
+		var title, status, poster, itemListStatus string
+		var voteAverage float64
+		if err := rows.Scan(&id, &tmdbID, &title, &status, &voteAverage, &poster, &totalEps, &watchedEps, &itemListStatus); err != nil {
+			continue
+		}
+		progress := 0.0
+		if totalEps > 0 {
+			progress = float64(watchedEps) / float64(totalEps) * 100
+		}
+		shows = append(shows, fiber.Map{
+			"id":           id,
+			"tmdb_id":      tmdbID,
+			"title":        title,
+			"media_type":   "tv",
+			"status":       status,
+			"list_status":  itemListStatus,
 			"vote_average": voteAverage,
 			"poster_url":   h.resolvePoster(poster),
 			"progress":     progress,
@@ -925,6 +988,7 @@ func (h *Handler) getUpcomingEpisodes(userID string) ([]upcomingPayload, error) 
 		JOIN episodes e ON e.season_id = sn.id
 		LEFT JOIN user_episodes ue ON ue.episode_id = e.id AND ue.user_id = $1::uuid
 		WHERE us.user_id = $1::uuid
+		  AND us.list_status IN ('watching', 'plan_to_watch')
 		  AND ue.id IS NULL
 		ORDER BY
 		  CASE WHEN e.air_date IS NULL THEN 1 ELSE 0 END,

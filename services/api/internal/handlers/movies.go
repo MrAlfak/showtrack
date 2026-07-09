@@ -47,7 +47,7 @@ func (h *Handler) GetMovie(c *fiber.Ctx) error {
 		release = *releaseDate
 	}
 
-	return c.JSON(fiber.Map{
+	resp := fiber.Map{
 		"id":           movieID,
 		"tmdb_id":      tmdbID,
 		"title":        title,
@@ -59,7 +59,15 @@ func (h *Handler) GetMovie(c *fiber.Ctx) error {
 		"cast":         cast,
 		"in_library":   inLibrary,
 		"watched":      watched,
-	})
+	}
+	if userID != "" {
+		var tmdbInt int
+		fmt.Sscanf(tmdbID, "%d", &tmdbInt)
+		if score, review, ok := h.getUserRating(userID, "movie", tmdbInt); ok {
+			resp["user_rating"] = fiber.Map{"score": score, "review": review}
+		}
+	}
+	return c.JSON(resp)
 }
 
 func (h *Handler) fetchAndReturnMovie(c *fiber.Ctx, tmdbIDStr string) error {
@@ -115,10 +123,18 @@ func (h *Handler) fetchAndReturnMovie(c *fiber.Ctx, tmdbIDStr string) error {
 func (h *Handler) AddMovie(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	var body struct {
-		TMDBID int `json:"tmdb_id"`
+		TMDBID     int    `json:"tmdb_id"`
+		ListStatus string `json:"list_status"`
 	}
 	if err := c.BodyParser(&body); err != nil || body.TMDBID == 0 {
 		return fiber.NewError(fiber.StatusBadRequest, "tmdb_id required")
+	}
+	listStatus := body.ListStatus
+	if listStatus == "" {
+		listStatus = "watching"
+	}
+	if !validListStatuses[listStatus] {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid list_status")
 	}
 
 	var movieID int
@@ -155,17 +171,17 @@ func (h *Handler) AddMovie(c *fiber.Ctx) error {
 		}
 	}
 
-	_, err = h.db.Exec(context.Background(),
-		`INSERT INTO user_movies (user_id, movie_id) VALUES ($1::uuid, $2) ON CONFLICT DO NOTHING`,
-		userID, movieID,
+	_, err = h.db.Exec(context.Background(), `
+		INSERT INTO user_movies (user_id, movie_id, list_status) VALUES ($1::uuid, $2, $3)
+		ON CONFLICT (user_id, movie_id) DO UPDATE SET list_status = EXCLUDED.list_status`,
+		userID, movieID, listStatus,
 	)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(fiber.Map{"ok": true, "movie_id": movieID})
-}
-
-func (h *Handler) RemoveMovie(c *fiber.Ctx) error {
+	h.logMovieAdded(userID, movieID, listStatus)
+	h.invalidateUserRecommendations(userID)
+	return c.JSON(fiber.Map{"ok": true, "movie_id": movieID, "list_status": listStatus})
 	userID := c.Locals("userID").(string)
 	movieID := c.Params("id")
 	_, err := h.db.Exec(context.Background(),
@@ -188,6 +204,7 @@ func (h *Handler) MarkMovieWatched(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
+	h.logMovieWatched(userID, movieID)
 	return c.JSON(fiber.Map{"ok": true})
 }
 
@@ -270,15 +287,21 @@ func (h *Handler) getMovieCast(movieID int) ([]fiber.Map, error) {
 	return cast, nil
 }
 
-func (h *Handler) getMovieLibraryItems(userID string) ([]fiber.Map, error) {
+func (h *Handler) getMovieLibraryItems(userID string, listStatus string) ([]fiber.Map, error) {
+	statusFilter := ""
+	args := []any{userID}
+	if listStatus != "" && validListStatuses[listStatus] {
+		statusFilter = " AND um.list_status = $2"
+		args = append(args, listStatus)
+	}
 	rows, err := h.db.Query(context.Background(), `
 		SELECT m.id, m.tmdb_id, m.title, m.vote_average,
 		       COALESCE(m.poster_local, m.poster_path, ''),
-		       um.watched
+		       um.watched, um.list_status
 		FROM user_movies um
 		JOIN movies m ON m.id = um.movie_id
-		WHERE um.user_id = $1::uuid
-		ORDER BY um.added_at DESC`, userID,
+		WHERE um.user_id = $1::uuid`+statusFilter+`
+		ORDER BY um.added_at DESC`, args...,
 	)
 	if err != nil {
 		return nil, err
@@ -288,10 +311,10 @@ func (h *Handler) getMovieLibraryItems(userID string) ([]fiber.Map, error) {
 	movies := []fiber.Map{}
 	for rows.Next() {
 		var id, tmdbID int
-		var title, poster string
+		var title, poster, itemListStatus string
 		var voteAverage float64
 		var watched bool
-		if err := rows.Scan(&id, &tmdbID, &title, &voteAverage, &poster, &watched); err != nil {
+		if err := rows.Scan(&id, &tmdbID, &title, &voteAverage, &poster, &watched, &itemListStatus); err != nil {
 			continue
 		}
 		progress := 0.0
@@ -303,6 +326,52 @@ func (h *Handler) getMovieLibraryItems(userID string) ([]fiber.Map, error) {
 			"tmdb_id":      tmdbID,
 			"title":        title,
 			"media_type":   "movie",
+			"list_status":  itemListStatus,
+			"vote_average": voteAverage,
+			"poster_url":   h.resolvePoster(poster),
+			"progress":     progress,
+			"watched":      boolToInt(watched),
+			"total":        1,
+		})
+	}
+	return movies, nil
+}
+
+func (h *Handler) getActiveMovieLibraryItems(userID string) ([]fiber.Map, error) {
+	rows, err := h.db.Query(context.Background(), `
+		SELECT m.id, m.tmdb_id, m.title, m.vote_average,
+		       COALESCE(m.poster_local, m.poster_path, ''),
+		       um.watched, um.list_status
+		FROM user_movies um
+		JOIN movies m ON m.id = um.movie_id
+		WHERE um.user_id = $1::uuid
+		  AND um.list_status IN ('watching', 'plan_to_watch')
+		ORDER BY um.added_at DESC`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	movies := []fiber.Map{}
+	for rows.Next() {
+		var id, tmdbID int
+		var title, poster, itemListStatus string
+		var voteAverage float64
+		var watched bool
+		if err := rows.Scan(&id, &tmdbID, &title, &voteAverage, &poster, &watched, &itemListStatus); err != nil {
+			continue
+		}
+		progress := 0.0
+		if watched {
+			progress = 100
+		}
+		movies = append(movies, fiber.Map{
+			"id":           id,
+			"tmdb_id":      tmdbID,
+			"title":        title,
+			"media_type":   "movie",
+			"list_status":  itemListStatus,
 			"vote_average": voteAverage,
 			"poster_url":   h.resolvePoster(poster),
 			"progress":     progress,

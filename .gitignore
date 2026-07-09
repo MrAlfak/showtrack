@@ -7,10 +7,13 @@ dist/
 .DS_Store
 graphify-out/
 infra/.compose.b64
-infra/secrets/
+infra/secrets/*
+!infra/secrets/.gitkeep
 apps/mobile/.dart_tool/
 apps/mobile/build/
 apps/mobile/.idea/
 apps/mobile/android/.gradle/
 apps/mobile/android/local.properties
+apps/mobile/android/build/
 apps/mobile/**/*.iml
+apps/web/.env.local

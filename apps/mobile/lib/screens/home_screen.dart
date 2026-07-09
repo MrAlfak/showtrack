@@ -15,6 +15,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> trending = [];
   List<dynamic> library = [];
+  List<dynamic> recommendations = [];
+  String recExplanation = '';
   bool loading = true;
 
   @override
@@ -28,9 +30,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = await Future.wait([
       widget.api.trending(),
       if (widget.api.isAuthenticated) widget.api.getDashboard() else Future.value(null),
+      if (widget.api.isAuthenticated) widget.api.getRecommendationsData() else Future.value(null),
     ]);
     trending = results[0] as List<dynamic>;
     final dashboard = results.length > 1 ? results[1] as Map<String, dynamic>? : null;
+    final recData = results.length > 2 ? results[2] as Map<String, dynamic>? : null;
+    recommendations = recData?['results'] as List<dynamic>? ?? [];
+    recExplanation = recData?['explanation'] as String? ?? '';
     library = dashboard?['library'] as List<dynamic>? ?? [];
     if (mounted) setState(() => loading = false);
   }
@@ -69,6 +75,29 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           const SizedBox(height: 24),
+          if (recommendations.isNotEmpty) ...[
+            const Text('پیشنهاد برای شما', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            if (recExplanation.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(recExplanation, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+              ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 168,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: recommendations.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (_, index) => ShowCard(
+                  api: widget.api,
+                  compact: true,
+                  item: recommendations[index] as Map<String, dynamic>,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
           const Text('پرطرفدار', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
           SizedBox(

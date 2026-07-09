@@ -4,6 +4,7 @@ import Image from "next/image";
 import { use, useEffect, useState } from "react";
 import { CheckCircle2, Plus, Star, Tv2 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { SignInPrompt } from "@/components/auth/auth-form";
 import { useLocale } from "@/components/locale/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WatchProvidersSection } from "@/components/watch-providers";
 import { addShow, getShow, markWatched, removeShow, type ShowDetail, unmarkWatched } from "@/lib/api";
+import { useCelebrate } from "@/lib/use-celebrate";
+import { cn } from "@/lib/utils";
 import { CastRow } from "@/components/cast-row";
+import { UserRatingSection } from "@/components/extras/user-rating";
+import { AddToListButton } from "@/components/extras/add-to-list";
 
 export default function ShowPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -23,6 +28,7 @@ export default function ShowPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true);
   const [pendingEpisode, setPendingEpisode] = useState<number | null>(null);
   const [pendingLibrary, setPendingLibrary] = useState(false);
+  const celebrate = useCelebrate();
 
   useEffect(() => {
     async function load() {
@@ -52,7 +58,7 @@ export default function ShowPage({ params }: { params: Promise<{ id: string }> }
   const nextEpisode = data.seasons.flatMap((season) => season.episodes).find((episode) => !episode.watched);
 
   return (
-    <div className="space-y-6">
+    <div className="tv-fade-in space-y-6">
       <div className="relative -mx-4 -mt-4 aspect-[16/10] overflow-hidden sm:mx-0 sm:mt-0 sm:rounded-xl">
         <Image
           src={data.poster_url}
@@ -79,52 +85,55 @@ export default function ShowPage({ params }: { params: Promise<{ id: string }> }
         </div>
       </div>
 
-      <Card className="border-border/60 bg-card/80 shadow-none">
+      <Card className={cn("tv-card shadow-none", celebrate.className)}>
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{t.detail.yourProgress}</span>
             <span className="font-medium">{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} className="h-2" />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button
-              className="w-full gap-2"
-              disabled={!isAuthenticated || !nextEpisode || pendingEpisode === nextEpisode.id}
-              onClick={async () => {
-                if (!token || !nextEpisode) return;
-                setPendingEpisode(nextEpisode.id);
-                const response = await markWatched(nextEpisode.id, token);
-                if (response?.ok) {
-                  const next = await getShow(id, token);
-                  setData(next);
-                }
-                setPendingEpisode(null);
-              }}
-            >
-              <CheckCircle2 className="size-4" />
-              {nextEpisode ? t.detail.markNextWatched : t.detail.allCaughtUp}
-            </Button>
-            <Button
-              variant={data.in_library ? "secondary" : "outline"}
-              className="w-full gap-2"
-              disabled={!isAuthenticated || pendingLibrary}
-              onClick={async () => {
-                if (!token) return;
-                setPendingLibrary(true);
-                if (data.in_library) {
-                  await removeShow(data.id, token);
-                } else {
-                  await addShow(Number(id), token);
-                }
-                const next = await getShow(id, token);
-                setData(next);
-                setPendingLibrary(false);
-              }}
-            >
-              {data.in_library ? <Tv2 className="size-4" /> : <Plus className="size-4" />}
-              {data.in_library ? t.detail.inLibrary : t.detail.addToLibrary}
-            </Button>
-          </div>
+          {!isAuthenticated ? (
+            <SignInPrompt />
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button
+                className="w-full gap-2"
+                disabled={!nextEpisode || pendingEpisode === nextEpisode?.id}
+                onClick={async () => {
+                  if (!token || !nextEpisode) return;
+                  setPendingEpisode(nextEpisode.id);
+                  const response = await markWatched(nextEpisode.id, token);
+                  if (response?.ok) {
+                    celebrate.celebrate();
+                    setData(await getShow(id, token));
+                  }
+                  setPendingEpisode(null);
+                }}
+              >
+                <CheckCircle2 className="size-4" />
+                {nextEpisode ? t.detail.markNextWatched : t.detail.allCaughtUp}
+              </Button>
+              <Button
+                variant={data.in_library ? "secondary" : "outline"}
+                className="w-full gap-2"
+                disabled={pendingLibrary}
+                onClick={async () => {
+                  if (!token) return;
+                  setPendingLibrary(true);
+                  if (data.in_library) {
+                    await removeShow(data.id, token);
+                  } else {
+                    await addShow(Number(id), token);
+                  }
+                  setData(await getShow(id, token));
+                  setPendingLibrary(false);
+                }}
+              >
+                {data.in_library ? <Tv2 className="size-4" /> : <Plus className="size-4" />}
+                {data.in_library ? t.detail.inLibrary : t.detail.addToLibrary}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -137,6 +146,25 @@ export default function ShowPage({ params }: { params: Promise<{ id: string }> }
 
       <WatchProvidersSection mediaType="tv" tmdbId={id} />
 
+      {token ? (
+        <div className="space-y-3">
+          <UserRatingSection
+            token={token}
+            mediaType="tv"
+            tmdbId={data.tmdb_id}
+            initialScore={data.user_rating?.score ?? 0}
+            initialReview={data.user_rating?.review ?? ""}
+          />
+          <AddToListButton
+            token={token}
+            mediaType="tv"
+            tmdbId={data.tmdb_id}
+            title={data.title}
+            posterUrl={data.poster_url}
+          />
+        </div>
+      ) : null}
+
       <section className="space-y-3">
         <h2 className="text-base font-semibold">{t.detail.cast}</h2>
         <CastRow cast={data.cast ?? []} />
@@ -148,7 +176,7 @@ export default function ShowPage({ params }: { params: Promise<{ id: string }> }
         <h2 className="text-base font-semibold">{t.detail.seasons}</h2>
         <div className="space-y-2">
           {(data.seasons ?? []).map((season) => (
-            <Card key={season.id} className="border-border/60 bg-card/80 py-0 shadow-none">
+            <Card key={season.id} className="tv-card py-0 shadow-none">
               <CardContent className="space-y-3 p-3">
                 <div className="flex items-center justify-between">
                   <div>
@@ -190,8 +218,8 @@ export default function ShowPage({ params }: { params: Promise<{ id: string }> }
                               ? await unmarkWatched(episode.id, token)
                               : await markWatched(episode.id, token);
                             if (response?.ok) {
-                              const next = await getShow(id, token);
-                              setData(next);
+                              if (!episode.watched) celebrate.celebrate();
+                              setData(await getShow(id, token));
                             }
                             setPendingEpisode(null);
                           }}

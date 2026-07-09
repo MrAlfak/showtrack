@@ -10,6 +10,13 @@ type Config struct {
 	MediaURL    string
 	JWTSecret   string
 	CORSOrigins string
+
+	GoogleClientID     string
+	TraktClientID      string
+	TraktClientSecret  string
+	TraktRedirectURI   string
+	PublicWebURL       string
+	AdminSecret        string
 }
 
 func Load() Config {
@@ -21,6 +28,13 @@ func Load() Config {
 		MediaURL:    getEnv("MEDIA_URL", "http://localhost:8090"),
 		JWTSecret:   getEnv("JWT_SECRET", "dev-secret-change-me"),
 		CORSOrigins: getEnv("CORS_ORIGINS", "*"),
+
+		GoogleClientID:    getEnv("GOOGLE_CLIENT_ID", ""),
+		TraktClientID:     getEnv("TRAKT_CLIENT_ID", ""),
+		TraktClientSecret: getEnv("TRAKT_CLIENT_SECRET", ""),
+		TraktRedirectURI:  getEnv("TRAKT_REDIRECT_URI", ""),
+		PublicWebURL:      getEnv("PUBLIC_WEB_URL", "http://localhost:3000"),
+		AdminSecret:       getEnv("ADMIN_SECRET", ""),
 	}
 }
 

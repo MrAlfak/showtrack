@@ -4,11 +4,10 @@ Self-hosted TV show tracker — inspired by TV Time, built with **shadcn/ui** de
 
 ## Features
 
-- Track TV shows and movies, mark episodes and films watched
+- Track shows and mark episodes watched
 - Search shows, movies, and people (TMDB)
 - Person pages with full filmography
 - Poster images self-hosted (WebP via sync worker)
-- Import/export watch history (TV + movies)
 - Push notifications (FCM + APNs) via dedicated container
 - Dark-first shadcn-inspired mobile UI (PWA-ready)
 
@@ -29,7 +28,9 @@ Self-hosted TV show tracker — inspired by TV Time, built with **shadcn/ui** de
 
 ```
 showtrack/
-├── apps/web/           # Next.js UI (shadcn design)
+├── apps/
+│   ├── web/            # Next.js UI
+│   └── mobile/         # Flutter Android
 ├── services/
 │   ├── api/            # REST API
 │   ├── sync/           # TMDB sync + poster download
@@ -76,8 +77,6 @@ docker compose run --rm sync
 
 ## Dokploy Deployment
 
-See [infra/DEPLOY.md](infra/DEPLOY.md) for step-by-step Dokploy setup.
-
 1. Create a new **Compose** project in Dokploy
 2. Point to this repo, set compose file: `infra/docker-compose.yml`
 3. Set environment variables from `.env.example`
@@ -93,23 +92,24 @@ See [infra/DEPLOY.md](infra/DEPLOY.md) for step-by-step Dokploy setup.
 ```
 GET  /api/v1/health
 GET  /api/v1/search?q=
-GET  /api/v1/trending
-GET  /api/v1/trending/movies
-GET  /api/v1/shows/:tmdb_id
-GET  /api/v1/movies/:tmdb_id
+GET  /api/v1/discover?type=tv|movie&genre=&sort=
+GET  /api/v1/genres?type=tv|movie
+GET  /api/v1/me/recommendations     (auth)
+POST /api/v1/me/onboarding          (auth)
 GET  /api/v1/persons/:tmdb_id
 POST /api/v1/auth/register
 POST /api/v1/auth/login
-GET  /api/v1/me/library          (auth)
+GET  /api/v1/me/library          (auth, ?list_status=)
 GET  /api/v1/me/dashboard        (auth)
 GET  /api/v1/me/export           (auth)
 POST /api/v1/me/import           (auth)
-POST /api/v1/shows               (auth)
+POST /api/v1/shows               (auth, list_status)
+PATCH /api/v1/shows/:id/status   (auth)
 DELETE /api/v1/shows/:id         (auth)
 POST /api/v1/movies              (auth)
-DELETE /api/v1/movies/:id        (auth)
-POST /api/v1/movies/:id/watched  (auth)
-DELETE /api/v1/movies/:id/watched (auth)
+PATCH /api/v1/movies/:id/status  (auth)
+GET  /api/v1/movies/:tmdb_id
+GET  /api/v1/trending/movies
 POST /api/v1/episodes/:id/watched (auth)
 DELETE /api/v1/episodes/:id/watched (auth)
 POST /api/v1/devices             (auth)

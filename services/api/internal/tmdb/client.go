@@ -226,6 +226,98 @@ func (c *Client) TrendingMovies() (*TrendingResponse, error) {
 	return &t, json.Unmarshal(body, &t)
 }
 
+type GenreListResponse struct {
+	Genres []Genre `json:"genres"`
+}
+
+func (c *Client) TVGenres() (*GenreListResponse, error) {
+	body, err := c.get("/genre/tv/list", url.Values{"language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var result GenreListResponse
+	return &result, json.Unmarshal(body, &result)
+}
+
+func (c *Client) MovieGenres() (*GenreListResponse, error) {
+	body, err := c.get("/genre/movie/list", url.Values{"language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var result GenreListResponse
+	return &result, json.Unmarshal(body, &result)
+}
+
+func (c *Client) DiscoverTV(genreID int, sort string) (*TrendingResponse, error) {
+	params := url.Values{
+		"language":       {"en-US"},
+		"sort_by":        {sort},
+		"include_adult":  {"false"},
+	}
+	if genreID > 0 {
+		params.Set("with_genres", fmt.Sprint(genreID))
+	}
+	body, err := c.get("/discover/tv", params)
+	if err != nil {
+		return nil, err
+	}
+	var t TrendingResponse
+	return &t, json.Unmarshal(body, &t)
+}
+
+func (c *Client) DiscoverMovie(genreID int, sort string) (*TrendingResponse, error) {
+	params := url.Values{
+		"language":      {"en-US"},
+		"sort_by":       {sort},
+		"include_adult": {"false"},
+	}
+	if genreID > 0 {
+		params.Set("with_genres", fmt.Sprint(genreID))
+	}
+	body, err := c.get("/discover/movie", params)
+	if err != nil {
+		return nil, err
+	}
+	var t TrendingResponse
+	return &t, json.Unmarshal(body, &t)
+}
+
+func (c *Client) SimilarTV(id int) (*TrendingResponse, error) {
+	body, err := c.get(fmt.Sprintf("/tv/%d/similar", id), url.Values{"language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var t TrendingResponse
+	return &t, json.Unmarshal(body, &t)
+}
+
+func (c *Client) SimilarMovie(id int) (*TrendingResponse, error) {
+	body, err := c.get(fmt.Sprintf("/movie/%d/similar", id), url.Values{"language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var t TrendingResponse
+	return &t, json.Unmarshal(body, &t)
+}
+
+func (c *Client) RecommendationsTV(id int) (*TrendingResponse, error) {
+	body, err := c.get(fmt.Sprintf("/tv/%d/recommendations", id), url.Values{"language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var t TrendingResponse
+	return &t, json.Unmarshal(body, &t)
+}
+
+func (c *Client) RecommendationsMovie(id int) (*TrendingResponse, error) {
+	body, err := c.get(fmt.Sprintf("/movie/%d/recommendations", id), url.Values{"language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var t TrendingResponse
+	return &t, json.Unmarshal(body, &t)
+}
+
 func PosterURL(path string, size string) string {
 	if path == "" {
 		return ""

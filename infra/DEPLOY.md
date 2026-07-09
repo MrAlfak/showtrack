@@ -37,6 +37,13 @@ Copy from `.env.example` and set in Dokploy:
 | `APNS_BUNDLE_ID` | No | `com.example.showtrack` |
 | `APNS_PRODUCTION` | No | `true` (use `false` for sandbox) |
 | `NEXT_PUBLIC_FIREBASE_*` | No | Web push (see `.env.example`) |
+| `GOOGLE_CLIENT_ID` | No | Same as Google OAuth client ID (API token verify) |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | No | Web Google Sign-In button |
+| `TRAKT_CLIENT_ID` | No | [Trakt API app](https://trakt.tv/oauth/applications) |
+| `TRAKT_CLIENT_SECRET` | No | Trakt app secret |
+| `TRAKT_REDIRECT_URI` | No | `https://api.example.com/api/v1/auth/trakt/callback` |
+| `PUBLIC_WEB_URL` | No | `https://app.example.com` (post-OAuth redirect) |
+| `ADMIN_SECRET` | No | Token for `/api/v1/admin/*` and web `/admin` |
 
 ## Step 3 — Push Secrets (Optional)
 

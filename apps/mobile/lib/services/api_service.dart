@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
 
+typedef ListStatus = String;
+
 class ApiService {
   ApiService(this._client);
 
@@ -12,6 +14,13 @@ class ApiService {
   String? _token;
 
   static const _tokenKey = 'showtrack.token';
+  static const listStatuses = [
+    'watching',
+    'plan_to_watch',
+    'watched',
+    'dropped',
+    'archived',
+  ];
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -31,6 +40,7 @@ class ApiService {
   }
 
   bool get isAuthenticated => _token != null && _token!.isNotEmpty;
+  String? get token => _token;
 
   Map<String, String> _headers({bool auth = false}) {
     final headers = {'Content-Type': 'application/json'};
@@ -74,6 +84,21 @@ class ApiService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>?> patchJson(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = false,
+  }) async {
+    final response = await _client.patch(
+      Uri.parse('${ApiConfig.baseUrl}$path'),
+      headers: _headers(auth: auth),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode >= 400) return null;
+    if (response.body.isEmpty) return {};
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>?> deleteJson(String path, {bool auth = false}) async {
     final response = await _client.delete(
       Uri.parse('${ApiConfig.baseUrl}$path'),
@@ -106,23 +131,83 @@ class ApiService {
 
   Future<Map<String, dynamic>?> getMovie(String id) => getJson('/movies/$id', auth: isAuthenticated);
 
+  Future<Map<String, dynamic>?> getPerson(String id) => getJson('/persons/$id');
+
   Future<Map<String, dynamic>?> getDashboard() => getJson('/me/dashboard', auth: true);
 
-  Future<Map<String, dynamic>?> addShow(int tmdbId) =>
-      postJson('/shows', {'tmdb_id': tmdbId}, auth: true);
+  Future<List<dynamic>> getGenres({String type = 'tv'}) async {
+    final data = await getJson('/genres?type=$type');
+    return data?['genres'] as List<dynamic>? ?? [];
+  }
 
-  Future<Map<String, dynamic>?> addMovie(int tmdbId) =>
-      postJson('/movies', {'tmdb_id': tmdbId}, auth: true);
+  Future<List<dynamic>> discover({String type = 'tv', int? genreId}) async {
+    final query = genreId != null ? '?type=$type&genre=$genreId' : '?type=$type';
+    return getList('/discover$query');
+  }
+
+  Future<List<dynamic>> getRecommendations() async {
+    final data = await getRecommendationsData();
+    return data?['results'] as List<dynamic>? ?? [];
+  }
+
+  Future<Map<String, dynamic>?> getRecommendationsData() =>
+      getJson('/me/recommendations', auth: true);
+
+  Future<Map<String, dynamic>?> getLibrary({ListStatus? listStatus}) {
+    final query = listStatus != null ? '?list_status=$listStatus' : '';
+    return getJson('/me/library$query', auth: true);
+  }
+
+  Future<Map<String, dynamic>?> addShow(int tmdbId, {ListStatus listStatus = 'watching'}) =>
+      postJson('/shows', {'tmdb_id': tmdbId, 'list_status': listStatus}, auth: true);
+
+  Future<Map<String, dynamic>?> removeShow(int showId) => deleteJson('/shows/$showId', auth: true);
+
+  Future<Map<String, dynamic>?> updateShowStatus(int showId, ListStatus status) =>
+      patchJson('/shows/$showId/status', {'list_status': status}, auth: true);
+
+  Future<Map<String, dynamic>?> addMovie(int tmdbId, {ListStatus listStatus = 'watching'}) =>
+      postJson('/movies', {'tmdb_id': tmdbId, 'list_status': listStatus}, auth: true);
+
+  Future<Map<String, dynamic>?> removeMovie(int movieId) => deleteJson('/movies/$movieId', auth: true);
+
+  Future<Map<String, dynamic>?> updateMovieStatus(int movieId, ListStatus status) =>
+      patchJson('/movies/$movieId/status', {'list_status': status}, auth: true);
 
   Future<Map<String, dynamic>?> markWatched(int episodeId) =>
       postJson('/episodes/$episodeId/watched', {}, auth: true);
 
+  Future<Map<String, dynamic>?> unmarkWatched(int episodeId) =>
+      deleteJson('/episodes/$episodeId/watched', auth: true);
+
   Future<Map<String, dynamic>?> markMovieWatched(int movieId) =>
       postJson('/movies/$movieId/watched', {}, auth: true);
+
+  Future<Map<String, dynamic>?> unmarkMovieWatched(int movieId) =>
+      deleteJson('/movies/$movieId/watched', auth: true);
 
   Future<Map<String, dynamic>?> registerDevice(String fcmToken) => postJson(
         '/devices',
         {'token': fcmToken, 'platform': 'android', 'app_version': '1.0.0'},
         auth: true,
       );
+
+  Future<Map<String, dynamic>?> getFeed({int? beforeId}) {
+    final query = beforeId != null ? '?before_id=$beforeId' : '';
+    return getJson('/me/feed$query', auth: true);
+  }
+
+  Future<List<dynamic>> searchUsers(String query) async {
+    final data = await getJson('/users/search?q=${Uri.encodeQueryComponent(query)}', auth: true);
+    return data?['results'] as List<dynamic>? ?? [];
+  }
+
+  Future<Map<String, dynamic>?> followUser(String userId) =>
+      postJson('/users/$userId/follow', {}, auth: true);
+
+  Future<Map<String, dynamic>?> unfollowUser(String userId) =>
+      deleteJson('/users/$userId/follow', auth: true);
+
+  Future<Map<String, dynamic>?> getUserProfile(String userId) =>
+      getJson('/users/$userId', auth: true);
 }

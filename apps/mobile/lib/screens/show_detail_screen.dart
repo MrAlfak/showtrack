@@ -31,6 +31,33 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     });
   }
 
+  Future<void> _pickListStatus() async {
+    final status = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: ApiService.listStatuses
+              .map((s) => ListTile(title: Text(_statusLabel(s)), onTap: () => Navigator.pop(ctx, s)))
+              .toList(),
+        ),
+      ),
+    );
+    if (status == null) return;
+    final showId = show!['id'] as int;
+    await widget.api.updateShowStatus(showId, status);
+    await _load();
+  }
+
+  String _statusLabel(String status) => switch (status) {
+        'watching' => 'در حال تماشا',
+        'plan_to_watch' => 'برای تماشا',
+        'watched' => 'تماشا شده',
+        'dropped' => 'رها شده',
+        'archived' => 'آرشیو',
+        _ => status,
+      };
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -42,6 +69,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
     final seasons = show!['seasons'] as List<dynamic>? ?? [];
     final inLibrary = show!['in_library'] == true;
+    final showId = show!['id'] as int?;
 
     return Scaffold(
       appBar: AppBar(title: Text(show!['title'] as String? ?? '')),
@@ -58,15 +86,40 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          if (widget.api.isAuthenticated)
-            FilledButton(
-              onPressed: () async {
-                final tmdbId = show!['tmdb_id'] as int? ?? int.tryParse(widget.tmdbId);
-                if (tmdbId != null && !inLibrary) await widget.api.addShow(tmdbId);
-                await _load();
-              },
-              child: Text(inLibrary ? 'در کتابخانه' : 'افزودن به کتابخانه'),
+          if (widget.api.isAuthenticated) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      final tmdbId = show!['tmdb_id'] as int? ?? int.tryParse(widget.tmdbId);
+                      if (tmdbId != null && !inLibrary) await widget.api.addShow(tmdbId);
+                      await _load();
+                    },
+                    child: Text(inLibrary ? 'در کتابخانه' : 'افزودن به کتابخانه'),
+                  ),
+                ),
+                if (inLibrary) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _pickListStatus,
+                    icon: const Icon(Icons.label_outline),
+                    tooltip: 'وضعیت',
+                  ),
+                  IconButton(
+                    onPressed: () async {
+                      if (showId != null) {
+                        await widget.api.removeShow(showId);
+                        await _load();
+                      }
+                    },
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'حذف',
+                  ),
+                ],
+              ],
             ),
+          ],
           const SizedBox(height: 12),
           Text(show!['overview'] as String? ?? '', style: TextStyle(color: Colors.grey.shade400)),
           const SizedBox(height: 24),
@@ -77,14 +130,21 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               title: Text(season['name'] as String? ?? 'Season'),
               children: episodes.map((episode) {
                 final watched = episode['watched'] == true;
+                final epId = episode['id'] as int;
                 return ListTile(
                   title: Text('E${episode['episode_number']} · ${episode['name']}'),
                   trailing: watched
-                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      ? IconButton(
+                          icon: const Icon(Icons.check_circle, color: Colors.green),
+                          onPressed: () async {
+                            await widget.api.unmarkWatched(epId);
+                            await _load();
+                          },
+                        )
                       : IconButton(
                           icon: const Icon(Icons.check),
                           onPressed: () async {
-                            await widget.api.markWatched(episode['id'] as int);
+                            await widget.api.markWatched(epId);
                             await _load();
                           },
                         ),

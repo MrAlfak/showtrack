@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { getDashboard } from "@/lib/api";
 
 type AuthContextValue = {
   token: string | null;
@@ -23,7 +24,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(() =>
     typeof window === "undefined" ? null : window.localStorage.getItem(USER_KEY)
   );
-  const ready = true;
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function validateSession() {
+      const storedToken = window.localStorage.getItem(TOKEN_KEY);
+      if (!storedToken) {
+        if (!cancelled) setReady(true);
+        return;
+      }
+
+      const dashboard = await getDashboard(storedToken);
+      if (cancelled) return;
+
+      if (!dashboard) {
+        window.localStorage.removeItem(TOKEN_KEY);
+        window.localStorage.removeItem(USER_KEY);
+        setToken(null);
+        setUserId(null);
+      }
+
+      setReady(true);
+    }
+
+    void validateSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({

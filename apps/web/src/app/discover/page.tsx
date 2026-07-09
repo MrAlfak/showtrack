@@ -1,27 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { trending, trendingMovies, type ShowItem } from "@/lib/api";
+import { discover, getGenres, type Genre, type ShowItem } from "@/lib/api";
 import { useLocale } from "@/components/locale/locale-provider";
 import { ShowCard } from "@/components/show-card";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const genres = ["Drama", "Sci-Fi", "Crime", "Fantasy", "Comedy", "Thriller"];
 
 export default function DiscoverPage() {
   const { t } = useLocale();
-  const [shows, setShows] = useState<ShowItem[]>([]);
-  const [movies, setMovies] = useState<ShowItem[]>([]);
+  const [mediaTab, setMediaTab] = useState<"tv" | "movie">("tv");
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState<number | null>(null);
+  const [items, setItems] = useState<ShowItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void Promise.all([trending(), trendingMovies()]).then(([trendingData, moviesData]) => {
-      setShows(trendingData?.results ?? []);
-      setMovies(moviesData?.results ?? []);
+    void getGenres(mediaTab).then((data) => {
+      setGenres(data?.genres ?? []);
     });
-  }, []);
+  }, [mediaTab]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const data = await discover(mediaTab, selectedGenre ?? undefined);
+      if (!cancelled) {
+        setItems(data?.results ?? []);
+        setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaTab, selectedGenre]);
 
   return (
     <div className="space-y-8">
@@ -30,54 +47,70 @@ export default function DiscoverPage() {
         <p className="text-sm text-muted-foreground">{t.discover.subtitle}</p>
       </header>
 
-      <section>
-        <SectionHeader title={t.discover.genres} />
-        <div className="flex flex-wrap gap-2">
-          {genres.map((genre) => (
-            <Badge key={genre} variant="secondary" className="cursor-pointer px-3 py-1.5 text-sm">
-              {genre}
-            </Badge>
-          ))}
-        </div>
-      </section>
+      <Tabs
+        value={mediaTab}
+        onValueChange={(v) => {
+          setMediaTab(v as "tv" | "movie");
+          setSelectedGenre(null);
+        }}
+      >
+        <TabsList className="h-9 w-full rounded-xl bg-secondary/80 p-1">
+          <TabsTrigger value="tv" className="flex-1 rounded-lg data-active:bg-[var(--tv-yellow)] data-active:text-black">
+            {t.home.tvShows}
+          </TabsTrigger>
+          <TabsTrigger value="movies" className="flex-1 rounded-lg data-active:bg-[var(--tv-yellow)] data-active:text-black">
+            {t.home.movies}
+          </TabsTrigger>
+        </TabsList>
 
-      <section>
-        <SectionHeader title={t.discover.trendingWeek} />
-        <Tabs defaultValue="tv">
-          <TabsList className="w-full">
-            <TabsTrigger value="tv" className="flex-1">{t.home.tvShows}</TabsTrigger>
-            <TabsTrigger value="movies" className="flex-1">{t.home.movies}</TabsTrigger>
-          </TabsList>
+        <TabsContent value={mediaTab} className="mt-6 space-y-6">
+          <section>
+            <SectionHeader title={t.discover.genres} />
+            <div className="flex flex-wrap gap-2">
+              <Badge
+                variant={selectedGenre === null ? "default" : "secondary"}
+                className="cursor-pointer px-3 py-1.5 text-sm"
+                onClick={() => setSelectedGenre(null)}
+              >
+                {t.discover.allGenres}
+              </Badge>
+              {genres.map((genre) => (
+                <Badge
+                  key={genre.id}
+                  variant={selectedGenre === genre.id ? "default" : "secondary"}
+                  className="cursor-pointer px-3 py-1.5 text-sm"
+                  onClick={() => setSelectedGenre(genre.id)}
+                >
+                  {genre.name}
+                </Badge>
+              ))}
+            </div>
+          </section>
 
-          <TabsContent value="tv" className="mt-4">
-            {shows.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {shows.map((show) => (
-                  <ShowCard key={show.tmdb_id} show={{ ...show, media_type: "tv" }} />
+          <section>
+            <SectionHeader title={t.discover.trendingWeek} />
+            {loading ? (
+              <div className="tv-scroll-row">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[2/3] w-[7.25rem] shrink-0 rounded-xl" />
+                ))}
+              </div>
+            ) : items.length > 0 ? (
+              <div className="tv-scroll-row">
+                {items.map((item) => (
+                  <ShowCard key={item.tmdb_id} show={{ ...item, media_type: mediaTab }} compact />
                 ))}
               </div>
             ) : (
-              <Card className="border-border/60 bg-card/80 py-0 shadow-none">
-                <CardContent className="p-4 text-sm text-muted-foreground">{t.discover.tvEmpty}</CardContent>
+              <Card className="tv-card py-0 shadow-none">
+                <CardContent className="p-4 text-sm text-muted-foreground">
+                  {mediaTab === "tv" ? t.discover.tvEmpty : t.discover.moviesEmpty}
+                </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="movies" className="mt-4">
-            {movies.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {movies.map((movie) => (
-                  <ShowCard key={movie.tmdb_id} show={{ ...movie, media_type: "movie" }} />
-                ))}
-              </div>
-            ) : (
-              <Card className="border-border/60 bg-card/80 py-0 shadow-none">
-                <CardContent className="p-4 text-sm text-muted-foreground">{t.discover.moviesEmpty}</CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
-      </section>
+          </section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

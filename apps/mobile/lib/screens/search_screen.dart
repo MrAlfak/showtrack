@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import 'movie_detail_screen.dart';
+import 'person_detail_screen.dart';
+import 'show_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, required this.api});
@@ -67,6 +70,15 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   title: Text(item['title'] as String? ?? ''),
                   subtitle: Text(mediaType),
+                  onTap: () {
+                    final id = '${item['id']}';
+                    final screen = mediaType == 'person'
+                        ? PersonDetailScreen(api: widget.api, tmdbId: id)
+                        : mediaType == 'movie'
+                            ? MovieDetailScreen(api: widget.api, tmdbId: id)
+                            : ShowDetailScreen(api: widget.api, tmdbId: id);
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+                  },
                   trailing: widget.api.isAuthenticated && mediaType != 'person'
                       ? IconButton(
                           icon: const Icon(Icons.add),

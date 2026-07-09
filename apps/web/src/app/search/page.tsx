@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Check, Plus, Search as SearchIcon } from "lucide-react";
+import { Check, Plus, Search as SearchIcon, SearchX } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { SignInPrompt } from "@/components/auth/auth-form";
 import { useLocale } from "@/components/locale/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { addShow, addMovie, search, type SearchItem } from "@/lib/api";
 
 export default function SearchPage() {
@@ -65,6 +67,8 @@ export default function SearchPage() {
         <p className="text-sm text-muted-foreground">{t.search.subtitle}</p>
       </header>
 
+      {!isAuthenticated && <SignInPrompt />}
+
       <div className="relative">
         <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -83,6 +87,8 @@ export default function SearchPage() {
         </div>
       ) : query.length < 2 ? (
         <p className="text-sm text-muted-foreground">{t.search.minChars}</p>
+      ) : results.length === 0 ? (
+        <EmptyState icon={SearchX} title={t.search.noResults} description={t.search.noResultsHint} />
       ) : (
         <Tabs defaultValue="all">
           <TabsList className="w-full">
@@ -160,7 +166,7 @@ function SearchResult({
         : `/shows/${item.id}`;
 
   return (
-    <Card className="border-border/60 bg-card/80 py-0 shadow-none transition-colors hover:border-border">
+    <Card className="tv-card py-0 shadow-none transition-colors hover:border-white/10">
       <CardContent className="flex items-center gap-3 p-3">
         <Link href={href} className="contents">
           <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-muted">

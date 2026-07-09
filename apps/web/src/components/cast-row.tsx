@@ -8,7 +8,7 @@ export function CastRow({ cast }: { cast: CastMember[] }) {
     <div className="flex gap-3 overflow-x-auto pb-2">
       {cast.map((person) => (
         <Link key={person.tmdb_id} href={`/persons/${person.tmdb_id}`} className="group shrink-0">
-          <Card className="w-24 border-border/60 bg-card/80 py-0 shadow-none">
+          <Card className="tv-card py-0 shadow-none">
             <CardContent className="flex flex-col items-center gap-2 p-2">
               <div className="relative size-16 overflow-hidden rounded-full border border-border/60">
                 <Image

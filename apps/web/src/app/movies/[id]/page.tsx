@@ -4,6 +4,7 @@ import Image from "next/image";
 import { use, useEffect, useState } from "react";
 import { CheckCircle2, Film, Plus, Star } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { SignInPrompt } from "@/components/auth/auth-form";
 import { useLocale } from "@/components/locale/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,11 @@ import {
   unmarkMovieWatched,
   type MovieDetail,
 } from "@/lib/api";
+import { useCelebrate } from "@/lib/use-celebrate";
+import { cn } from "@/lib/utils";
 import { CastRow } from "@/components/cast-row";
+import { UserRatingSection } from "@/components/extras/user-rating";
+import { AddToListButton } from "@/components/extras/add-to-list";
 
 export default function MoviePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -28,6 +33,7 @@ export default function MoviePage({ params }: { params: Promise<{ id: string }> 
   const [data, setData] = useState<MovieDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const celebrate = useCelebrate();
 
   useEffect(() => {
     async function load() {
@@ -54,7 +60,7 @@ export default function MoviePage({ params }: { params: Promise<{ id: string }> 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="tv-fade-in space-y-6">
       <div className="relative -mx-4 -mt-4 aspect-[16/10] overflow-hidden sm:mx-0 sm:mt-0 sm:rounded-xl">
         <Image
           src={data.poster_url}
@@ -86,8 +92,11 @@ export default function MoviePage({ params }: { params: Promise<{ id: string }> 
         </div>
       </div>
 
-      <Card className="border-border/60 bg-card/80 shadow-none">
+      <Card className={cn("tv-card shadow-none", celebrate.className)}>
         <CardContent className="space-y-3 p-4">
+          {!isAuthenticated ? (
+            <SignInPrompt />
+          ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button
               className="w-full gap-2"
@@ -100,8 +109,8 @@ export default function MoviePage({ params }: { params: Promise<{ id: string }> 
                   ? await unmarkMovieWatched(data.id, token)
                   : await markMovieWatched(data.id, token);
                 if (response?.ok) {
-                  const next = await getMovie(id, token);
-                  setData(next);
+                  if (!data.watched) celebrate.celebrate();
+                  setData(await getMovie(id, token));
                 }
                 setPending(false);
               }}
@@ -130,6 +139,7 @@ export default function MoviePage({ params }: { params: Promise<{ id: string }> 
               {data.in_library ? t.detail.inLibrary : t.detail.addToLibrary}
             </Button>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -141,6 +151,25 @@ export default function MoviePage({ params }: { params: Promise<{ id: string }> 
       )}
 
       <WatchProvidersSection mediaType="movie" tmdbId={id} />
+
+      {token ? (
+        <div className="space-y-3">
+          <UserRatingSection
+            token={token}
+            mediaType="movie"
+            tmdbId={data.tmdb_id}
+            initialScore={data.user_rating?.score ?? 0}
+            initialReview={data.user_rating?.review ?? ""}
+          />
+          <AddToListButton
+            token={token}
+            mediaType="movie"
+            tmdbId={data.tmdb_id}
+            title={data.title}
+            posterUrl={data.poster_url}
+          />
+        </div>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">{t.detail.cast}</h2>

@@ -14,23 +14,40 @@ class DiscoverScreen extends StatefulWidget {
 
 class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabs;
-  List<dynamic> shows = [];
-  List<dynamic> movies = [];
+  List<dynamic> genres = [];
+  int? selectedGenre;
+  List<dynamic> items = [];
   bool loading = true;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    _tabs.addListener(() {
+      if (!_tabs.indexIsChanging) {
+        setState(() => selectedGenre = null);
+        _load();
+        _loadGenres();
+      }
+    });
+    _loadGenres();
     _load();
+  }
+
+  Future<void> _loadGenres() async {
+    final type = _tabs.index == 0 ? 'tv' : 'movie';
+    final data = await widget.api.getGenres(type: type);
+    if (mounted) setState(() => genres = data);
   }
 
   Future<void> _load() async {
     setState(() => loading = true);
-    final results = await Future.wait([widget.api.trending(), widget.api.trendingMovies()]);
-    shows = results[0];
-    movies = results[1];
-    if (mounted) setState(() => loading = false);
+    final type = _tabs.index == 0 ? 'tv' : 'movie';
+    final data = await widget.api.discover(type: type, genreId: selectedGenre);
+    if (mounted) setState(() {
+      items = data;
+      loading = false;
+    });
   }
 
   @override
@@ -41,6 +58,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    const yellow = Color(0xFFFFD60A);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -50,37 +69,67 @@ class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProvid
         ),
         TabBar(
           controller: _tabs,
+          indicatorColor: yellow,
+          labelColor: yellow,
           tabs: const [Tab(text: 'سریال'), Tab(text: 'فیلم')],
+        ),
+        SizedBox(
+          height: 48,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: const Text('همه'),
+                  selected: selectedGenre == null,
+                  onSelected: (_) {
+                    setState(() => selectedGenre = null);
+                    _load();
+                  },
+                ),
+              ),
+              ...genres.map((g) {
+                final map = g as Map<String, dynamic>;
+                final id = map['id'] as int;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(map['name'] as String? ?? ''),
+                    selected: selectedGenre == id,
+                    onSelected: (_) {
+                      setState(() => selectedGenre = id);
+                      _load();
+                    },
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
         Expanded(
           child: loading
               ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                  controller: _tabs,
-                  children: [
-                    _grid(shows, 'tv'),
-                    _grid(movies, 'movie'),
-                  ],
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.62,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (_, index) {
+                    final type = _tabs.index == 0 ? 'tv' : 'movie';
+                    return ShowCard(
+                      api: widget.api,
+                      item: {...items[index] as Map<String, dynamic>, 'media_type': type},
+                    );
+                  },
                 ),
         ),
       ],
-    );
-  }
-
-  Widget _grid(List<dynamic> items, String mediaType) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.62,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, index) => ShowCard(
-        api: widget.api,
-        item: {...items[index] as Map<String, dynamic>, 'media_type': mediaType},
-      ),
     );
   }
 }

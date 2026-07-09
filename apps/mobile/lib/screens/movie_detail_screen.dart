@@ -42,6 +42,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     final inLibrary = movie!['in_library'] == true;
     final watched = movie!['watched'] == true;
+    final movieId = movie!['id'] as int?;
 
     return Scaffold(
       appBar: AppBar(title: Text(movie!['title'] as String? ?? '')),
@@ -68,15 +69,34 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               child: Text(inLibrary ? 'در کتابخانه' : 'افزودن به کتابخانه'),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: inLibrary
-                  ? () async {
-                      final movieId = movie!['id'] as int;
-                      await widget.api.markMovieWatched(movieId);
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: inLibrary && movieId != null
+                        ? () async {
+                            if (watched) {
+                              await widget.api.unmarkMovieWatched(movieId);
+                            } else {
+                              await widget.api.markMovieWatched(movieId);
+                            }
+                            await _load();
+                          }
+                        : null,
+                    child: Text(watched ? 'لغو تماشا' : 'علامت تماشا'),
+                  ),
+                ),
+                if (inLibrary && movieId != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () async {
+                      await widget.api.removeMovie(movieId);
                       await _load();
-                    }
-                  : null,
-              child: Text(watched ? 'تماشا شده' : 'علامت تماشا'),
+                    },
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+                ],
+              ],
             ),
           ],
           const SizedBox(height: 12),

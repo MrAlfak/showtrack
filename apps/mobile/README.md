@@ -1,54 +1,55 @@
-# ShowTrack Mobile (Flutter)
+# ShowTrack Mobile (Flutter Android)
 
-Android client for ShowTrack — connects to the self-hosted Go API.
-
-## Prerequisites
-
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) 3.22+
-- Android Studio or Android SDK
-
-## First-time setup
-
-From repo root:
+## Setup
 
 ```powershell
-cd apps/mobile
-flutter create . --platforms=android --org com.showtrack
+# از ریشه پروژه — mirror مایکت برای ایران
+.\scripts\setup-flutter.ps1
+
+cd apps\mobile
 flutter pub get
 ```
 
-`flutter create` generates the `android/` folder. The `lib/` source is already included.
-
-## Run (local API)
+## Run (dev)
 
 ```powershell
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1
 ```
 
-Use your machine LAN IP instead of `10.0.2.2` on a physical device.
-
-## Run (production)
-
-```powershell
-flutter run --dart-define=API_BASE_URL=https://showtrack-api.firstdata.ir/api/v1
-```
+`10.0.2.2` = localhost از داخل emulator اندروید.
 
 ## Build APK
 
 ```powershell
-flutter build apk --release --dart-define=API_BASE_URL=https://showtrack-api.firstdata.ir/api/v1
+flutter build apk --release `
+  --dart-define=API_BASE_URL=https://showtrack-api.firstdata.ir/api/v1
 ```
 
-Output: `build/app/outputs/flutter-apk/app-release.apk`
+خروجی: `build/app/outputs/flutter-apk/app-release.apk`
+
+## Push (FCM) — اختیاری
+
+Firebase Console → پروژه → Android app (`com.showtrack.showtrack_mobile`):
+
+1. `google-services.json` را در `android/app/` بگذار
+2. build با dart-define:
+
+```powershell
+flutter build apk --release `
+  --dart-define=API_BASE_URL=https://showtrack-api.firstdata.ir/api/v1 `
+  --dart-define=FIREBASE_PROJECT_ID=your-project `
+  --dart-define=FIREBASE_API_KEY=... `
+  --dart-define=FIREBASE_APP_ID=... `
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=...
+```
+
+بدون این مقادیر، اپ کار می‌کند ولی push ثبت نمی‌شود.
 
 ## Features
 
-- Home dashboard (library + trending)
-- Discover (TV + movies tabs)
-- Search and add to library
-- Show/movie detail with watch progress
-- Profile auth + stats (Persian UI)
-
-## Push notifications
-
-Register FCM token via `POST /devices` after integrating `firebase_messaging` (optional next step).
+- ورود / ثبت‌نام
+- کتابخانه با وضعیت‌های TV Time
+- mark/unmark قسمت و فیلم
+- حذف از کتابخانه
+- صفحه بازیگر
+- تم تیره + زرد TV Time
