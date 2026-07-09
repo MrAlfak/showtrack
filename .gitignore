@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.env
+.env.local
+*.exe
+dist/
+.DS_Store
+graphify-out/
+infra/.compose.b64
+infra/secrets/
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.idea/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/**/*.iml

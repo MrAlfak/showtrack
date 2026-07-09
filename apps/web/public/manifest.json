@@ -1,0 +1,18 @@
+{
+  "name": "ShowTrack",
+  "short_name": "ShowTrack",
+  "description": "Self-hosted TV show and movie tracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/placeholder-poster.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
