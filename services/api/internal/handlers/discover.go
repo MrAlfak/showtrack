@@ -42,9 +42,9 @@ func (h *Handler) GetGenres(c *fiber.Ctx) error {
 	if h.cfg.TMDBAPIKey == "" {
 		genres = demoGenres()
 	} else if mediaType == "movie" {
-		list, err := h.tmdb.MovieGenres()
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadGateway, err.Error())
+		list, tmdbErr := h.tmdb.MovieGenres()
+		if tmdbErr != nil {
+			return fiber.NewError(fiber.StatusBadGateway, tmdbErr.Error())
 		}
 		for _, g := range list.Genres {
 			genres = append(genres, genreItem{ID: g.ID, Name: g.Name})
