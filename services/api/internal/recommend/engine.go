@@ -359,7 +359,7 @@ func (e *Engine) genreWeights(ctx context.Context, userID string) (map[int]float
 	return weights, topGenreName
 }
 
-func applyGenreBytes(weights, names map[int]float64, raw []byte, w float64) {
+func applyGenreBytes(weights map[int]float64, names map[int]string, raw []byte, w float64) {
 	if len(raw) == 0 {
 		return
 	}
