@@ -237,8 +237,8 @@ func (h *Handler) Onboarding(c *fiber.Ctx) error {
 			var movieID int
 			err := h.db.QueryRow(context.Background(), `SELECT id FROM movies WHERE tmdb_id = $1`, item.TMDBID).Scan(&movieID)
 			if err == pgx.ErrNoRows && h.cfg.TMDBAPIKey != "" {
-				movie, err := h.tmdb.GetMovie(item.TMDBID)
-				if err != nil {
+				movie, tmdbErr := h.tmdb.GetMovie(item.TMDBID)
+				if tmdbErr != nil {
 					continue
 				}
 				genres, _ := json.Marshal(movie.Genres)
@@ -266,8 +266,8 @@ func (h *Handler) Onboarding(c *fiber.Ctx) error {
 		var showID int
 		err := h.db.QueryRow(context.Background(), `SELECT id FROM shows WHERE tmdb_id = $1`, item.TMDBID).Scan(&showID)
 		if err == pgx.ErrNoRows && h.cfg.TMDBAPIKey != "" {
-			show, err := h.tmdb.GetTVShow(item.TMDBID)
-			if err != nil {
+			show, tmdbErr := h.tmdb.GetTVShow(item.TMDBID)
+			if tmdbErr != nil {
 				continue
 			}
 			genres, _ := json.Marshal(show.Genres)

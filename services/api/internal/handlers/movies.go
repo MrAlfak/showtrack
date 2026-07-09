@@ -145,8 +145,8 @@ func (h *Handler) AddMovie(c *fiber.Ctx) error {
 		if h.cfg.TMDBAPIKey == "" {
 			return fiber.NewError(fiber.StatusNotFound, "movie not found")
 		}
-		movie, err := h.tmdb.GetMovie(body.TMDBID)
-		if err != nil {
+		movie, tmdbErr := h.tmdb.GetMovie(body.TMDBID)
+		if tmdbErr != nil {
 			return fiber.NewError(fiber.StatusNotFound, "movie not found on tmdb")
 		}
 		genres, _ := json.Marshal(movie.Genres)

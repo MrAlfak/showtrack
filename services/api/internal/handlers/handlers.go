@@ -649,8 +649,8 @@ func (h *Handler) AddShow(c *fiber.Ctx) error {
 	).Scan(&showID)
 	if err == pgx.ErrNoRows {
 		if h.cfg.TMDBAPIKey != "" {
-			show, err := h.tmdb.GetTVShow(body.TMDBID)
-			if err != nil {
+			show, tmdbErr := h.tmdb.GetTVShow(body.TMDBID)
+			if tmdbErr != nil {
 				return fiber.NewError(fiber.StatusNotFound, "show not found on tmdb")
 			}
 			genres, _ := json.Marshal(show.Genres)
