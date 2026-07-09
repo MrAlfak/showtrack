@@ -182,6 +182,9 @@ func (h *Handler) AddMovie(c *fiber.Ctx) error {
 	h.logMovieAdded(userID, movieID, listStatus)
 	h.invalidateUserRecommendations(userID)
 	return c.JSON(fiber.Map{"ok": true, "movie_id": movieID, "list_status": listStatus})
+}
+
+func (h *Handler) RemoveMovie(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	movieID := c.Params("id")
 	_, err := h.db.Exec(context.Background(),

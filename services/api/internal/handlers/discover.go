@@ -290,6 +290,6 @@ func (h *Handler) Onboarding(c *fiber.Ctx) error {
 		}
 	}
 
-	_ = h.invalidateUserRecommendations(userID)
+	h.invalidateUserRecommendations(userID)
 	return c.JSON(fiber.Map{"ok": true, "added": added})
 }
