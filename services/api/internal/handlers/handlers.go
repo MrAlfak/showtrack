@@ -1252,9 +1252,10 @@ func (h *Handler) getUserProgress(userID string, showID int) (int, int, error) {
 
 func (h *Handler) syncShowDetails(showID int, show *tmdb.TVShow) error {
 	ctx := context.Background()
+	var err error
 	for _, season := range show.Seasons {
 		var seasonID int
-		err := h.db.QueryRow(ctx, `
+		err = h.db.QueryRow(ctx, `
 			INSERT INTO seasons (show_id, season_number, name, episode_count, poster_path)
 			VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (show_id, season_number) DO UPDATE

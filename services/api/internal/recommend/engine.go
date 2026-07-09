@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/showtrack/api/internal/tmdb"
 )
@@ -535,7 +536,9 @@ func (e *Engine) fromGenres(ctx context.Context, weights map[int]float64, exclud
 			continue
 		}
 
-		rows, err := e.DB.Query(ctx, `
+		var rows pgx.Rows
+		var err error
+		rows, err = e.DB.Query(ctx, `
 			SELECT tmdb_id, title, COALESCE(poster_path, ''), COALESCE(vote_average, 0), 'tv'
 			FROM shows
 			WHERE EXISTS (
