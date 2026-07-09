@@ -1266,8 +1266,8 @@ func (h *Handler) syncShowDetails(showID int, show *tmdb.TVShow) error {
 			return err
 		}
 
-		seasonDetails, err := h.tmdb.GetSeason(show.ID, season.SeasonNumber)
-		if err != nil {
+		seasonDetails, seasonErr := h.tmdb.GetSeason(show.ID, season.SeasonNumber)
+		if seasonErr != nil {
 			continue
 		}
 		for _, episode := range seasonDetails.Episodes {
