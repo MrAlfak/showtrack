@@ -1028,9 +1028,9 @@ func (h *Handler) resolveImportedShow(item importItem) (int, error) {
 		if h.cfg.TMDBAPIKey == "" {
 			return 0, pgx.ErrNoRows
 		}
-		show, err := h.tmdb.GetTVShow(item.TMDBID)
-		if err != nil {
-			return 0, err
+		show, tmdbErr := h.tmdb.GetTVShow(item.TMDBID)
+		if tmdbErr != nil {
+			return 0, tmdbErr
 		}
 		genres, _ := json.Marshal(show.Genres)
 		err = h.db.QueryRow(context.Background(), `

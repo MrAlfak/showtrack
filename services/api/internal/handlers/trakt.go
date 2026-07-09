@@ -197,9 +197,9 @@ func (h *Handler) ensureTraktToken(userID string, client *trakt.Client) (string,
 	if time.Now().Before(expiresAt.Add(-5 * time.Minute)) {
 		return accessToken, nil
 	}
-	token, err := client.RefreshToken(refreshToken)
-	if err != nil {
-		return "", err
+	token, refreshErr := client.RefreshToken(refreshToken)
+	if refreshErr != nil {
+		return "", refreshErr
 	}
 	newExpiry := time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
 	_, _ = h.db.Exec(context.Background(), `

@@ -453,9 +453,9 @@ func (h *Handler) resolveImportedMovie(item importItem) (int, error) {
 		if h.cfg.TMDBAPIKey == "" {
 			return 0, pgx.ErrNoRows
 		}
-		movie, err := h.tmdb.GetMovie(item.TMDBID)
-		if err != nil {
-			return 0, err
+		movie, tmdbErr := h.tmdb.GetMovie(item.TMDBID)
+		if tmdbErr != nil {
+			return 0, tmdbErr
 		}
 		genres, _ := json.Marshal(movie.Genres)
 		err = h.db.QueryRow(context.Background(), `
