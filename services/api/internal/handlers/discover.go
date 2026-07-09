@@ -88,7 +88,6 @@ func (h *Handler) Discover(c *fiber.Ctx) error {
 	}
 
 	var result *tmdb.TrendingResponse
-	var err error
 
 	if mediaType == "movie" {
 		result, err = h.tmdb.DiscoverMovie(genreID, sort)
