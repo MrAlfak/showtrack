@@ -1197,8 +1197,7 @@ func getTime(item map[string]any, keys ...string) *time.Time {
 			continue
 		}
 		for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02"} {
-			parsed, err := time.Parse(layout, text)
-			if err == nil {
+			if parsed, parseErr := time.Parse(layout, text); parseErr == nil {
 				return &parsed
 			}
 		}
