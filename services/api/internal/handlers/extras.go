@@ -268,6 +268,7 @@ func (h *Handler) loadList(listID, userID string) (fiber.Map, []fiber.Map, error
 		return nil, nil, pgx.ErrNoRows
 	}
 
+	var rows pgx.Rows
 	rows, err = h.db.Query(context.Background(), `
 		SELECT media_type, tmdb_id, title, poster_path
 		FROM custom_list_items WHERE list_id = $1::uuid ORDER BY added_at DESC`, listID,
