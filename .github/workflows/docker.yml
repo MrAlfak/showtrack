@@ -58,6 +58,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Publish API package
+        continue-on-error: true
         run: gh api -X PATCH "/users/${{ github.repository_owner }}/packages/container/showtrack-api/visibility" -f visibility=public
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,6 +102,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Publish web package
+        continue-on-error: true
         run: gh api -X PATCH "/users/${{ github.repository_owner }}/packages/container/showtrack-web/visibility" -f visibility=public
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
