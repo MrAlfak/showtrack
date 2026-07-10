@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (h *Handler) requireAdmin(c *fiber.Ctx) error {
+func (h *Handler) RequireAdmin(c *fiber.Ctx) error {
 	if h.cfg.AdminSecret == "" {
 		return fiber.NewError(fiber.StatusServiceUnavailable, "admin not configured")
 	}

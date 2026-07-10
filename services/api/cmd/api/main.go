@@ -107,7 +107,7 @@ func main() {
 	protected.Post("/me/lists/:id/items", h.AddListItem)
 	protected.Delete("/me/lists/:id/items", h.RemoveListItem)
 
-	admin := api.Group("/admin", h.requireAdmin)
+	admin := api.Group("/admin", h.RequireAdmin)
 	admin.Get("/stats", h.AdminStats)
 	admin.Get("/users", h.AdminUsers)
 
