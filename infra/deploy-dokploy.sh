@@ -27,6 +27,7 @@ start_background_pull() {
   echo "==> Starting background GHCR pull (Dokploy 5min timeout workaround)"
   (
     pull_images
+    rm -f "$PIDFILE"
   ) >>"$LOG" 2>&1 &
   echo $! >"$PIDFILE"
   disown || true
@@ -37,17 +38,6 @@ start_background_pull() {
 
 if ! have_images; then
   start_background_pull
-fi
-
-if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-  echo "==> Waiting for background pull..."
-  wait "$(cat "$PIDFILE")" || true
-  rm -f "$PIDFILE"
-fi
-
-if ! have_images; then
-  echo "==> Images still missing; starting pull again"
-  pull_images
 fi
 
 echo "==> Starting stack"
