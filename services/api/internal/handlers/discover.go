@@ -238,7 +238,7 @@ func (h *Handler) Onboarding(c *fiber.Ctx) error {
 		}
 		if mediaType == "movie" {
 			var movieID int
-			err := h.db.QueryRow(context.Background(), `SELECT id FROM movies WHERE tmdb_id = $1`, item.TMDBID).Scan(&movieID)
+			err = h.db.QueryRow(context.Background(), `SELECT id FROM movies WHERE tmdb_id = $1`, item.TMDBID).Scan(&movieID)
 			if err == pgx.ErrNoRows && h.cfg.TMDBAPIKey != "" {
 				movie, tmdbErr := h.tmdb.GetMovie(item.TMDBID)
 				if tmdbErr != nil {
@@ -267,7 +267,7 @@ func (h *Handler) Onboarding(c *fiber.Ctx) error {
 		}
 
 		var showID int
-		err := h.db.QueryRow(context.Background(), `SELECT id FROM shows WHERE tmdb_id = $1`, item.TMDBID).Scan(&showID)
+		err = h.db.QueryRow(context.Background(), `SELECT id FROM shows WHERE tmdb_id = $1`, item.TMDBID).Scan(&showID)
 		if err == pgx.ErrNoRows && h.cfg.TMDBAPIKey != "" {
 			show, tmdbErr := h.tmdb.GetTVShow(item.TMDBID)
 			if tmdbErr != nil {
