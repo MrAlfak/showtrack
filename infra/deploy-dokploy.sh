@@ -25,8 +25,11 @@ start_background_pull() {
     exit 0
   fi
   echo "==> Starting background GHCR pull (Dokploy 5min timeout workaround)"
-  nohup bash -c "$(declare -f pull_images); pull_images" >>"$LOG" 2>&1 &
+  (
+    pull_images
+  ) >>"$LOG" 2>&1 &
   echo $! >"$PIDFILE"
+  disown || true
   echo "==> Pull pid $(cat "$PIDFILE"). Log: $LOG"
   echo "==> Redeploy in ~5-10 minutes after pull completes."
   exit 0
