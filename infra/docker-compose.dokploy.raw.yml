@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: showtrack
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-showtrack}
+      POSTGRES_DB: showtrack
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U showtrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+
+  api:
+    image: localhost:5000/showtrack-api:latest
+    pull_policy: if_not_present
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://showtrack:${POSTGRES_PASSWORD:-showtrack}@postgres:5432/showtrack?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      MEDIA_URL: ${MEDIA_URL:-http://media:80}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
+      TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}
+      TRAKT_REDIRECT_URI: ${TRAKT_REDIRECT_URI:-}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
+      ADMIN_SECRET: ${ADMIN_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  web:
+    image: localhost:5000/showtrack-web:latest
+    pull_policy: if_not_present
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+    depends_on:
+      - api
+    expose:
+      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  media:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - poster_data:/usr/share/nginx/html
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    expose:
+      - "80"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  pgdata:
+  redisdata:
+  poster_data:

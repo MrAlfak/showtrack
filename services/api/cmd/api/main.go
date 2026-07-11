@@ -29,6 +29,10 @@ func main() {
 	}
 	defer pool.Close()
 
+	if err := db.Migrate(context.Background(), pool); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+
 	redis := db.ConnectRedis(cfg.RedisURL)
 	defer redis.Close()
 
