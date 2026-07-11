@@ -36,8 +36,8 @@ services:
           memory: 320M
 
   api:
-    image: ghcr.io/mralfak/showtrack-api:latest
-    pull_policy: always
+    image: ${SHOWTRACK_API_IMAGE:-ghcr.io/mralfak/showtrack-api:latest}
+    pull_policy: if_not_present
     restart: unless-stopped
     environment:
       PORT: "8080"
@@ -66,8 +66,8 @@ services:
           memory: 256M
 
   web:
-    image: ghcr.io/mralfak/showtrack-web:latest
-    pull_policy: always
+    image: ${SHOWTRACK_WEB_IMAGE:-ghcr.io/mralfak/showtrack-web:latest}
+    pull_policy: if_not_present
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
