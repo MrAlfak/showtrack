@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/showtrack/api/internal/config"
@@ -244,7 +246,7 @@ func (h *Handler) GetShow(c *fiber.Ctx) error {
 		tmdbID,
 	).Scan(&showID, &title, &overview, &status, &voteAverage, &posterPath, &posterLocal)
 
-	if err == pgx.ErrNoRows {
+	if err == pgx.ErrNoRows || isMissingRelation(err) {
 		if h.cfg.TMDBAPIKey == "" {
 			show := demoShow(tmdbID)
 			return c.JSON(show)
@@ -1107,6 +1109,14 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func isMissingRelation(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return pgErr.Code == "42P01"
 }
 
 func firstNonEmpty(values ...string) string {

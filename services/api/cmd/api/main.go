@@ -32,6 +32,7 @@ func main() {
 	if err := db.Migrate(context.Background(), pool); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
+	log.Println("database schema ready")
 
 	redis := db.ConnectRedis(cfg.RedisURL)
 	defer redis.Close()
